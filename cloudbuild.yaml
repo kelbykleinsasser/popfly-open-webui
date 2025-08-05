@@ -1,5 +1,5 @@
 substitutions:
-  _CACHE_IMAGE: 'gcr.io/${PROJECT_ID}/open-webui:cache'
+  _CACHE_IMAGE: 'gcr.io/popfly-open-webui/open-webui:cache'
 
 steps:
   # Pull cache image if it exists
@@ -19,14 +19,14 @@ steps:
       - '-f'
       - 'deployment/Dockerfile.production'
       - '-t'
-      - 'gcr.io/${PROJECT_ID}/open-webui:latest'
+      - 'gcr.io/popfly-open-webui/open-webui:latest'
       - '-t'
       - '${_CACHE_IMAGE}'
       - '.'
 
 images:
-  - 'gcr.io/${PROJECT_ID}/open-webui:latest'
-  - 'gcr.io/${PROJECT_ID}/open-webui:cache'
+  - 'gcr.io/popfly-open-webui/open-webui:latest'
+  - 'gcr.io/popfly-open-webui/open-webui:cache'
 
 options:
   machineType: 'E2_HIGHCPU_8'

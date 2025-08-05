@@ -1,0 +1,92 @@
+# Production Dockerfile for Open WebUI
+# Simplified version without multi-platform build args
+
+ARG USE_CUDA=false
+ARG USE_OLLAMA=false
+ARG USE_CUDA_VER=cu128
+ARG USE_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+ARG USE_RERANKING_MODEL=""
+ARG USE_TIKTOKEN_ENCODING_NAME="cl100k_base"
+ARG BUILD_HASH=production-build
+ARG UID=0
+ARG GID=0
+
+######## WebUI frontend ########
+FROM node:22-alpine3.20 AS build
+ARG BUILD_HASH
+
+WORKDIR /app
+
+# to store git revision in build
+RUN apk add --no-cache git
+
+COPY src/package.json src/package-lock.json ./
+RUN npm ci --force
+
+COPY src .
+RUN npm run build
+
+######## WebUI backend ########
+FROM python:3.11-slim-bookworm AS base
+
+ARG USE_CUDA
+ARG USE_OLLAMA
+ARG USE_CUDA_VER
+ARG USE_EMBEDDING_MODEL
+ARG USE_RERANKING_MODEL
+ARG USE_TIKTOKEN_ENCODING_NAME
+ARG UID
+ARG GID
+
+ENV ENV=prod \
+    PORT=8080 \
+    # pass build args to the build
+    USE_OLLAMA_DOCKER=${USE_OLLAMA} \
+    USE_CUDA_DOCKER=${USE_CUDA} \
+    USE_CUDA_DOCKER_VER=${USE_CUDA_VER} \
+    USE_EMBEDDING_MODEL_DOCKER=${USE_EMBEDDING_MODEL} \
+    USE_RERANKING_MODEL_DOCKER=${USE_RERANKING_MODEL} \
+    USE_TIKTOKEN_ENCODING_NAME_DOCKER=${USE_TIKTOKEN_ENCODING_NAME}
+
+## Basis ##
+ENV ENV=prod
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=UTF-8
+
+WORKDIR /app/backend
+
+# Create user and set permissions
+RUN if [ "$UID" -ne 0 ]; then \
+        if [ "$GID" -ne 0 ]; then \
+            addgroup --gid "$GID" app; \
+        fi; \
+        adduser --uid "$UID" --gid "$GID" --home /app --shell /bin/sh --disabled-password app; \
+    fi
+
+RUN apt-get update && \
+    apt-get install -y pandoc netcat-openbsd curl build-essential && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY src/backend/requirements.txt .
+RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --no-cache-dir && \
+    pip3 install -r requirements.txt --no-cache-dir
+
+# Copy backend code
+COPY src/backend .
+
+# Copy built frontend
+COPY --from=build /app/build ./static
+
+# Set ownership
+RUN if [ "$UID" -ne 0 ] && [ "$GID" -ne 0 ]; then \
+        chown -R "$UID:$GID" /app; \
+    fi
+
+USER $UID:$GID
+
+HEALTHCHECK CMD curl --silent --fail http://localhost:${PORT}/health || exit 1
+
+CMD ["python3", "main.py"]

@@ -1,0 +1,146 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: open-webui
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/execution-environment: gen2
+    run.googleapis.com/cpu-throttling: "false"
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/memory: "2Gi"
+        run.googleapis.com/cpu: "2"
+        run.googleapis.com/max-scale: "10"
+        run.googleapis.com/min-scale: "1"
+        # Cloud SQL connection (uncomment and configure if using Cloud SQL)
+        # run.googleapis.com/cloudsql-instances: PROJECT_ID:REGION:INSTANCE_NAME
+        # Timeout for long-running requests (AI generation)
+        run.googleapis.com/timeout: "3600s"
+    spec:
+      containerConcurrency: 100
+      timeoutSeconds: 3600
+      containers:
+      - name: open-webui
+        # Replace with your actual image URL after building and pushing
+        image: gcr.io/YOUR_PROJECT_ID/open-webui:latest
+        ports:
+        - containerPort: 8080
+        env:
+        # Basic Configuration
+        - name: ENV
+          value: "prod"
+        - name: PORT
+          value: "8080"
+        - name: WEBUI_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-secrets
+              key: WEBUI_SECRET_KEY
+        
+        # Google OAuth Configuration
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-secrets
+              key: GOOGLE_CLIENT_ID
+        - name: GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-secrets
+              key: GOOGLE_CLIENT_SECRET
+        - name: ENABLE_OAUTH_SIGNUP
+          value: "True"
+        - name: OAUTH_MERGE_ACCOUNTS_BY_EMAIL
+          value: "True"
+        - name: GOOGLE_OAUTH_SCOPE
+          value: "openid email profile https://www.googleapis.com/auth/admin.directory.group.member.readonly"
+        - name: OAUTH_ALLOWED_DOMAINS
+          value: "yourdomain.com"  # Replace with your domain
+        
+        # Group & Role Management
+        - name: ENABLE_OAUTH_GROUP_MANAGEMENT
+          value: "True"
+        - name: ENABLE_OAUTH_ROLE_MANAGEMENT
+          value: "True"
+        - name: OAUTH_GROUPS_CLAIM
+          value: "groups"
+        - name: OAUTH_ROLES_CLAIM
+          value: "groups"
+        - name: OAUTH_ADMIN_ROLES
+          value: "admin,openwebui-admins"
+        
+        # User Permissions
+        - name: USER_PERMISSIONS_WORKSPACE_MODELS_ACCESS
+          value: "True"
+        - name: USER_PERMISSIONS_WORKSPACE_TOOLS_ACCESS
+          value: "True"
+        - name: USER_PERMISSIONS_WORKSPACE_KNOWLEDGE_ACCESS
+          value: "True"
+        - name: USER_PERMISSIONS_WORKSPACE_PROMPTS_ACCESS
+          value: "True"
+        
+        # Database Configuration
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-secrets
+              key: DATABASE_URL
+        
+        # External APIs (optional)
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-secrets
+              key: OPENAI_API_KEY
+        
+        # Security & Performance
+        - name: SCARF_NO_ANALYTICS
+          value: "true"
+        - name: DO_NOT_TRACK
+          value: "true"
+        - name: WEBUI_AUTH
+          value: "True"
+        
+        resources:
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+          requests:
+            cpu: "1"
+            memory: "1Gi"
+        
+        # Health check
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        
+        # Mount volumes for persistent data
+        volumeMounts:
+        - name: data-volume
+          mountPath: /app/backend/data
+      
+      # Use Cloud Storage FUSE or persistent disk for data
+      volumes:
+      - name: data-volume
+        emptyDir: {}
+        # For production, consider using:
+        # persistentVolumeClaim:
+        #   claimName: open-webui-data-pvc
+  
+  traffic:
+  - percent: 100
+    latestRevision: true

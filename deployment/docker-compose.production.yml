@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  open-webui:
+    build:
+      context: ../src
+      dockerfile: Dockerfile
+      args:
+        BUILD_HASH: ${BUILD_HASH:-production}
+    image: open-webui-production:latest
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Database Configuration
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/backend/data/webui.db}
+      
+      # OAuth Configuration
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - ENABLE_OAUTH_SIGNUP=${ENABLE_OAUTH_SIGNUP:-True}
+      - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=${OAUTH_MERGE_ACCOUNTS_BY_EMAIL:-True}
+      - GOOGLE_OAUTH_SCOPE=${GOOGLE_OAUTH_SCOPE:-openid email profile https://www.googleapis.com/auth/admin.directory.group.member.readonly}
+      - OAUTH_ALLOWED_DOMAINS=${OAUTH_ALLOWED_DOMAINS:-*}
+      - OAUTH_UPDATE_PICTURE_ON_LOGIN=${OAUTH_UPDATE_PICTURE_ON_LOGIN:-True}
+      
+      # Group Management
+      - ENABLE_OAUTH_GROUP_MANAGEMENT=${ENABLE_OAUTH_GROUP_MANAGEMENT:-True}
+      - ENABLE_OAUTH_GROUP_CREATION=${ENABLE_OAUTH_GROUP_CREATION:-False}
+      - OAUTH_GROUPS_CLAIM=${OAUTH_GROUPS_CLAIM:-groups}
+      - OAUTH_BLOCKED_GROUPS=${OAUTH_BLOCKED_GROUPS:-[]}
+      
+      # Role Management
+      - ENABLE_OAUTH_ROLE_MANAGEMENT=${ENABLE_OAUTH_ROLE_MANAGEMENT:-True}
+      - OAUTH_ROLES_CLAIM=${OAUTH_ROLES_CLAIM:-groups}
+      - OAUTH_ALLOWED_ROLES=${OAUTH_ALLOWED_ROLES:-user,admin}
+      - OAUTH_ADMIN_ROLES=${OAUTH_ADMIN_ROLES:-admin,openwebui-admins}
+      
+      # User Permissions - Enable for OAuth users
+      - USER_PERMISSIONS_WORKSPACE_MODELS_ACCESS=${USER_PERMISSIONS_WORKSPACE_MODELS_ACCESS:-True}
+      - USER_PERMISSIONS_WORKSPACE_TOOLS_ACCESS=${USER_PERMISSIONS_WORKSPACE_TOOLS_ACCESS:-True}
+      - USER_PERMISSIONS_WORKSPACE_KNOWLEDGE_ACCESS=${USER_PERMISSIONS_WORKSPACE_KNOWLEDGE_ACCESS:-True}
+      - USER_PERMISSIONS_WORKSPACE_PROMPTS_ACCESS=${USER_PERMISSIONS_WORKSPACE_PROMPTS_ACCESS:-True}
+      - USER_PERMISSIONS_WORKSPACE_MODELS_ALLOW_PUBLIC_SHARING=${USER_PERMISSIONS_WORKSPACE_MODELS_ALLOW_PUBLIC_SHARING:-True}
+      - USER_PERMISSIONS_WORKSPACE_TOOLS_ALLOW_PUBLIC_SHARING=${USER_PERMISSIONS_WORKSPACE_TOOLS_ALLOW_PUBLIC_SHARING:-True}
+      - USER_PERMISSIONS_FEATURES_WEB_SEARCH=${USER_PERMISSIONS_FEATURES_WEB_SEARCH:-True}
+      - USER_PERMISSIONS_FEATURES_IMAGE_GENERATION=${USER_PERMISSIONS_FEATURES_IMAGE_GENERATION:-True}
+      - USER_PERMISSIONS_FEATURES_CODE_INTERPRETER=${USER_PERMISSIONS_FEATURES_CODE_INTERPRETER:-True}
+      
+      # Security
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      - WEBUI_AUTH=${WEBUI_AUTH:-True}
+      
+      # External APIs
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      
+      # Performance & Caching
+      - SENTENCE_TRANSFORMERS_HOME=/app/backend/data/cache/embedding/models
+      - HF_HOME=/app/backend/data/cache/embedding/models
+      - WHISPER_MODEL_DIR=/app/backend/data/cache/whisper/models
+      - TIKTOKEN_CACHE_DIR=/app/backend/data/cache/tiktoken
+      
+      # GCP Configuration
+      - PORT=8080
+      - ENV=prod
+      - DOCKER=true
+      
+      # Telemetry (disabled for production)
+      - SCARF_NO_ANALYTICS=true
+      - DO_NOT_TRACK=true
+      - ANONYMIZED_TELEMETRY=false
+      
+    volumes:
+      # Persistent data storage
+      - open_webui_data:/app/backend/data
+      # Mount your custom .env file if needed
+      - ../src/.env:/app/backend/.env:ro
+    
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - open-webui-network
+
+  # Optional: Include Ollama if needed
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    networks:
+      - open-webui-network
+    profiles:
+      - with-ollama
+
+volumes:
+  open_webui_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+networks:
+  open-webui-network:
+    driver: bridge

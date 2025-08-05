@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================
-# Deploy Open WebUI from Git Repository
+# Deploy Open WebUI via Cloud Build Trigger
 # ==============================================
 
 set -e
@@ -11,38 +11,54 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Configuration
 PROJECT_ID=${GCP_PROJECT_ID:-"popfly-open-webui"}
 REGION=${GCP_REGION:-"us-central1"}
 SERVICE_NAME="open-webui"
-REPO_URL="https://github.com/kelbykleinsasser/popfly-open-webui"
 
-echo -e "${GREEN}🚀 Deploying Open WebUI from Git Repository${NC}"
-echo "Repository: $REPO_URL"
+echo -e "${GREEN}🚀 Deploying Open WebUI via Cloud Build Trigger${NC}"
 echo "Project: $PROJECT_ID"
 echo ""
 
-# Build from current Git repository (much faster than local upload)
-echo -e "${BLUE}📥 Building from Git repository...${NC}"
+# Push latest changes to GitHub
+echo -e "${BLUE}📤 Pushing latest changes to GitHub...${NC}"
 cd ..
+git add .
+git status
+read -p "Commit message (or press Enter for default): " commit_msg
+if [[ -z "$commit_msg" ]]; then
+    commit_msg="Deploy update $(date +%Y-%m-%d\ %H:%M)"
+fi
 
-# Ensure latest changes are pushed
+git commit -m "$commit_msg
+
+🤖 Generated with Claude Code
+
+Co-Authored-By: Claude <noreply@anthropic.com>" || echo "No changes to commit"
+
 git push
-
-# Submit build using the git repository
-gcloud builds submit \
-    --config="cloudbuild.yaml" \
-    --project="$PROJECT_ID" \
-    .
 cd deployment
+
+# Trigger the build
+echo -e "${BLUE}🔨 Triggering Cloud Build...${NC}"
+gcloud builds triggers run open-webui-deploy \
+    --branch=main \
+    --project="$PROJECT_ID"
+
+echo ""
+echo -e "${YELLOW}🔍 Monitor build progress:${NC}"
+echo "https://console.cloud.google.com/cloud-build/builds?project=$PROJECT_ID"
+
+# Wait for build to complete and deploy
+echo ""
+read -p "Press Enter after build completes to deploy to Cloud Run..."
 
 # Deploy to Cloud Run
 echo -e "${BLUE}🚀 Deploying to Cloud Run...${NC}"
 
 # Update the Cloud Run YAML with actual project ID
-sed "s/YOUR_PROJECT_ID/$PROJECT_ID/g" deployment/cloudrun.yaml > cloudrun-deploy.yaml
+sed "s/YOUR_PROJECT_ID/$PROJECT_ID/g" cloudrun.yaml > cloudrun-deploy.yaml
 
 # Deploy using gcloud
 gcloud run services replace cloudrun-deploy.yaml \
@@ -71,6 +87,3 @@ rm -f cloudrun-deploy.yaml
 echo ""
 echo -e "${YELLOW}🔧 Next Steps:${NC}"
 echo "1. Update your Google OAuth redirect URIs to include: $SERVICE_URL/oauth/google/callback"
-echo "2. Create Google Groups (openwebui-admins, openwebui-users) in Google Admin Console"
-echo "3. Add users to appropriate groups for role assignment"
-echo "4. Test the OAuth login flow"

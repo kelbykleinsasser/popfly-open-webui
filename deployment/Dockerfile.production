@@ -24,6 +24,8 @@ COPY src/package.json src/package-lock.json ./
 RUN npm ci --force
 
 COPY src .
+# Increase Node.js memory limit for large build
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 ######## WebUI backend ########

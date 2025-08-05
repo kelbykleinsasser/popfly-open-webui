@@ -96,7 +96,7 @@ build_and_push() {
     
     # Build with Cloud Build using custom configuration (from deployment directory)
     gcloud builds submit \
-        --config="cloudbuild.yaml" \
+        --config="../cloudbuild.yaml" \
         --project="$PROJECT_ID" \
         ../
     

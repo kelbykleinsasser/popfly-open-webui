@@ -27,7 +27,7 @@ echo ""
 # Clone from Git and build
 echo -e "${BLUE}📥 Building from Git repository...${NC}"
 gcloud builds submit \
-    --config="deployment/cloudbuild.yaml" \
+    --config="cloudbuild.yaml" \
     --project="$PROJECT_ID" \
     "$REPO_URL"
 

@@ -29,7 +29,7 @@ images:
   - 'gcr.io/popfly-open-webui/open-webui:cache'
 
 options:
-  machineType: 'E2_HIGHMEM_8'
+  machineType: 'N1_HIGHCPU_8'
   diskSizeGb: 100
   env:
     - 'DOCKER_BUILDKIT=1'

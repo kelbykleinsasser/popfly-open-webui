@@ -67,7 +67,7 @@ RUN if [ "$UID" -ne 0 ]; then \
     fi
 
 RUN apt-get update && \
-    apt-get install -y pandoc netcat-openbsd curl build-essential && \
+    apt-get install -y pandoc netcat-openbsd curl build-essential jq && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -76,19 +76,27 @@ COPY src/backend/requirements.txt .
 RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --no-cache-dir && \
     pip3 install -r requirements.txt --no-cache-dir
 
-# Copy backend code
-COPY src/backend .
-
 # Copy built frontend
-COPY --from=build /app/build ./static
+COPY --from=build /app/build /app/build
+COPY --from=build /app/CHANGELOG.md /app/CHANGELOG.md
+COPY --from=build /app/package.json /app/package.json
+
+# Copy backend code
+COPY --chown=$UID:$GID src/backend .
 
 # Set ownership
 RUN if [ "$UID" -ne 0 ] && [ "$GID" -ne 0 ]; then \
         chown -R "$UID:$GID" /app; \
     fi
 
+EXPOSE 8080
+
+HEALTHCHECK CMD curl --silent --fail http://localhost:${PORT:-8080}/health | jq -ne 'input.status == true' || exit 1
+
 USER $UID:$GID
 
-HEALTHCHECK CMD curl --silent --fail http://localhost:${PORT}/health || exit 1
+ARG BUILD_HASH
+ENV WEBUI_BUILD_VERSION=${BUILD_HASH}
+ENV DOCKER=true
 
-CMD ["python3", "main.py"]
+CMD ["bash", "start.sh"]

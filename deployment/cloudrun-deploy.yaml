@@ -24,7 +24,7 @@ spec:
       containers:
       - name: open-webui
         # Replace with your actual image URL after building and pushing
-        image: gcr.io/YOUR_PROJECT_ID/open-webui:latest
+        image: gcr.io/popfly-open-webui/open-webui:latest
         ports:
         - containerPort: 8080
         env:

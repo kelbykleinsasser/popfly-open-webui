@@ -84,6 +84,9 @@ COPY --from=build /app/package.json /app/package.json
 # Copy backend code
 COPY src/backend .
 
+# Set Python path to ensure module resolution works
+ENV PYTHONPATH=/app/backend:$PYTHONPATH
+
 EXPOSE 8080
 
 HEALTHCHECK CMD curl --silent --fail http://localhost:${PORT:-8080}/health | jq -ne 'input.status == true' || exit 1

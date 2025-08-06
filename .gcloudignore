@@ -29,6 +29,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+venv/
+.venv/
 
 # Log files
 *.log
@@ -52,3 +54,11 @@ setup-dev.sh
 
 # README (not needed for build)
 README.md
+
+# Large directories not needed for production build
+src/backend/data/
+static/assets/emojis/
+static/pyodide/
+cypress/
+test/
+src/backend/open_webui/test/
